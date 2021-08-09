@@ -1,4 +1,4 @@
-# Explorer Authentication
+# Authentication
 The authentication part of the edge-ml project which can be found [here](https://github.com/edge-ml).
 
 [![Tests](https://github.com/edge-ml/authentication/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/edge-ml/authentication/actions/workflows/tests.yml)
