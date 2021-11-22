@@ -207,7 +207,9 @@ async function changeUserMail(ctx, passport) {
         ctx.status = 400;
       } else {
         await Model.findByIdAndUpdate({ _id: user._id }, { $set: { email } });
-        ctx.body = {message: `Changed e-mail address from ${user.email} to ${email}`};
+        ctx.body = {
+          message: `Changed e-mail address from ${user.email} to ${email}`,
+        };
         ctx.status = 200;
       }
     })(ctx);
@@ -279,8 +281,7 @@ async function getUsersIds(ctx, passport) {
       return ctx;
     }
     const userNames = ctx.request.body;
-    if (
-      !Array.isArray(userNames)) {
+    if (!Array.isArray(userNames)) {
       ctx.body = { error: "Provide valid usernames in an array" };
       ctx.status = 401;
       return ctx;
@@ -307,6 +308,7 @@ async function getUsersIds(ctx, passport) {
 
 async function getUserNames(ctx, passport) {
   await passport.authenticate("jwt", async (err, user, info) => {
+    try {
       if (info) {
         ctx.body = { error: "Unauthorized" };
         ctx.status = 401;
@@ -314,32 +316,32 @@ async function getUserNames(ctx, passport) {
       }
       const userIds = ctx.request.body;
       if (
-        !(Array.isArray(userIds) && userIds.every((elm) => ObjectId.isValid(elm)))
+        !(
+          Array.isArray(userIds) &&
+          userIds.every((elm) => ObjectId.isValid(elm))
+        )
       ) {
         ctx.body = { error: "Provide valid ids in an array" };
         ctx.status = 401;
         return ctx;
       }
-      const users = await Model.find({ _id: userIds });
-      console.log(users)
-      if (users.length != userIds.length) {
-        ctx.body = { error: "Some userIds could not be found" };
-        ctx.status = 400;
-      }
       const res = [];
-      for (i = 0; i < userIds.length; i++) {
-        for (j = 0; j < userIds.length; j++) {
-          if (String(userIds[i]) === String(users[j]._id)) {
-            res.push({ _id: users[j]._id, userName: users[j].userName });
-          }
-        }
-      }
+      const users = await Model.find({ _id: userIds }, { userName: 1 });
+      userIds.forEach((userId) => {
+        const user = users.find((elm) => String(elm._id) === userId) || {
+          _id: userId,
+          userName: "Not found",
+        };
+        res.push(user);
+      });
       ctx.body = res;
       ctx.status = 200;
       return ctx;
+    } catch (e) {
+      console.log(e);
+    }
   })(ctx);
 }
-
 
 async function getUserNameSuggestions(ctx, passport) {
   await passport.authenticate("jwt", async (err, user, info) => {
@@ -359,7 +361,8 @@ async function getUserNameSuggestions(ctx, passport) {
 }
 
 function validateEmail(email) {
-  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  const re =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return email && re.test(String(email).toLowerCase());
 }
 

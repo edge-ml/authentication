@@ -77,8 +77,6 @@ async function init2Fa(ctx) {
 	ctx.body = await QRCode.toDataURL(twoFasecret.otpauth_url);
 	ctx.type = 'image/png';
 
-	console.log('QR Code:', ctx.body);
-
 	ctx.status = 200;
 	return ctx;
 }
