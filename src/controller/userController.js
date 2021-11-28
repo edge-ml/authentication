@@ -330,7 +330,7 @@ async function getUserNames(ctx, passport) {
       userIds.forEach((userId) => {
         const user = users.find((elm) => String(elm._id) === userId) || {
           _id: userId,
-          userName: "Not found",
+          error: "User not found",
         };
         res.push(user);
       });
@@ -352,7 +352,7 @@ async function getUserNameSuggestions(ctx, passport) {
     }
     var regexp = new RegExp("^" + ctx.request.body.userName);
     const possibleUsers = await Model.find({ userName: regexp })
-      .limit(7)
+      .limit(100)
       .select({ userName: 1, _id: 0 });
     ctx.body = possibleUsers.map((elm) => elm.userName);
     ctx.status = 200;
