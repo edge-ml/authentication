@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:16
 
 WORKDIR /opt/aura-auth
 COPY package*.json ./
