@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "stats": "node stats.js",
     "start:docker": "NODE_ENV=production node server.js",
     "test": "NODE_ENV=test nyc mocha --exit",
     "createAdmin": "node createAdmin.js"
@@ -39,6 +40,7 @@
     "qrcode": "^1.4.4",
     "speakeasy": "^2.0.0",
     "supertest": "^4.0.2",
+    "table": "^6.8.0",
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
