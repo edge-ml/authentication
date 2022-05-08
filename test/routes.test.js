@@ -19,16 +19,18 @@ let refreshToken = "";
 let userID = "";
 
 describe("Testing API Routes", () => {
-  before("check connection", (done) => {
+  before("check connection", function (done) {
+    this.timeout(5000);
     mongoose.connection.on("connected", () => {
-      done();
+      return done();
     });
-  });
+  })
 
-  before("drop collections", (done) => {
+  before("drop collections", function (done) {
+    this.timeout(5000);
     mongoose.connection.db.dropDatabase();
-    done();
-  });
+    return done();
+  })
 
   // REGISTER
   describe("POST /register", () => {
