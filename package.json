@@ -1,7 +1,7 @@
 {
   "name": "authentication",
   "version": "1.0.0",
-  "description": "Authentication Server for AURA",
+  "description": "Authentication Server for Edge-ML",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,44 +10,39 @@
     "test": "NODE_ENV=test nyc mocha --exit",
     "createAdmin": "node createAdmin.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "aura-development@vs-ssh.visualstudio.com:v3/aura-development/Aura/authentication"
-  },
-  "author": "Jennifer Münk <muenk@teco.edu>",
+  "author": "Edge-ML",
   "license": "MIT",
   "dependencies": {
-    "bcrypt": "^5.0.0",
+    "bcrypt": "^5.0.1",
     "bcryptjs": "^2.4.3",
-    "chai": "^4.3.0",
-    "config": "^1.30.0",
+    "chai": "^4.3.6",
+    "config": "^3.3.7",
     "jsonwebtoken": "^8.5.1",
     "jwt-decode": "^3.1.2",
-    "koa": "^2.13.1",
+    "koa": "^2.13.4",
     "koa-bodyparser": "^4.3.0",
-    "koa-convert": "^1.2.0",
+    "koa-convert": "^2.0.0",
     "koa-cors": "0.0.16",
     "koa-logger": "^3.2.1",
-    "koa-mongoose-erd-generator": "^0.0.6",
-    "koa-passport": "^4.1.3",
-    "koa-router": "^7.4.0",
+    "koa-mongoose-erd-generator": "^0.0.7",
+    "koa-passport": "^4.1.4",
+    "koa-router": "^10.1.1",
     "koa-static": "^5.0.0",
-    "koa2-swagger-ui": "^5.1.0",
-    "mocha": "^6.2.3",
-    "mongoose": "^5.11.18",
-    "nyc": "^14.1.1",
+    "koa2-swagger-ui": "^5.5.0",
+    "mocha": "^10.0.0",
+    "mongoose": "^6.3.2",
+    "nyc": "^15.1.0",
     "passport-jwt": "^4.0.0",
-    "qrcode": "^1.4.4",
+    "qrcode": "^1.5.0",
     "speakeasy": "^2.0.0",
-    "supertest": "^4.0.2",
+    "supertest": "^6.2.3",
     "table": "^6.8.0",
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
-    "eslint": "^5.16.0",
-    "eslint-config-airbnb": "^17.1.1",
-    "eslint-plugin-import": "^2.22.1",
-    "eslint-plugin-node": "^7.0.1",
-    "nodemon": "^1.19.4"
+    "eslint": "^8.15.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-node": "^11.1.0"
   }
 }

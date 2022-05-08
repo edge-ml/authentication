@@ -4,10 +4,6 @@ const Model 			 = require('./src/models/userModel').model;
 
 const email 			 = process.env.npm_config_email;
 
-// suppress deprecation warnings
-mongoose.set('useFindAndModify', false);
-mongoose.set('useCreateIndex', true);
-
 const config = Config.get('server');
 mongoose.connect(config.db, {useNewUrlParser: true}).catch(e => console.log(e));
 
