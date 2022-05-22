@@ -75,6 +75,7 @@ async function loginUser(ctx) {
       userName: user.userName,
       twoFactorEnabled: user.twoFactorEnabled,
       twoFactorVerified: false,
+      subscriptionLevel: user.subscriptionLevel,
     };
 
     const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
@@ -121,6 +122,7 @@ async function loginUserRefresh(ctx) {
       id: user._id,
       twoFactorEnabled: user.twoFactorEnabled,
       twoFactorVerified: false,
+      subscriptionLevel: user.subscriptionLevel,
     };
 
     const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
@@ -271,6 +273,15 @@ async function changeUserPassword(ctx, passport) {
       ctx.status = 400;
     }
   })(ctx);
+}
+
+/**
+ * TODO
+ * Change the subscription level of a user
+ */
+
+async function changeUserSubscriptionLevel(ctx, passport) {
+  
 }
 
 async function getUsersIds(ctx, passport) {

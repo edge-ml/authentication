@@ -34,6 +34,11 @@ const User = new mongoose.Schema({
 	},
 	twoFactorToken: {
 		type: Object
+	},
+	subscriptionLevel: {
+		type: String,
+		enum: ['standard', 'upgraded', 'unlimited'],
+		default: 'standard'
 	}
 });
 
