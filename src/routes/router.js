@@ -1,6 +1,8 @@
 const Router = require("koa-router");
+
 const userController = require("../controller/userController");
 const authController = require("../controller/authController");
+const paymentController = require("../controller/paymentController");
 
 module.exports = (app, passport) => {
   const prefixRouter = new Router();
@@ -148,6 +150,14 @@ module.exports = (app, passport) => {
 
   router.post("/userNameSuggest", async (ctx) => {
     await userController.getUserNameSuggestions(ctx, passport);
+  });
+
+  router.get("/customerId", async (ctx) => {
+    await paymentController.getCustomerId(ctx, passport);
+  })
+
+  router.post('/webhook', async (ctx) => {
+    await paymentController.handleWebhookEvent(ctx);
   });
 
   prefixRouter.use("/auth", router.routes(), router.allowedMethods());

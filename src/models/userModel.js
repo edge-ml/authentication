@@ -9,7 +9,6 @@ const User = new mongoose.Schema({
 		unique: [true, 'email address already in use'],
 		match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'email address not valid']
 	},
-
 	userName: {
 		type: String,
 		required: [true, 'please enter a username'],
@@ -34,6 +33,9 @@ const User = new mongoose.Schema({
 	},
 	twoFactorToken: {
 		type: Object
+	},
+	customerId: {
+		type: String
 	},
 	subscriptionLevel: {
 		type: String,
