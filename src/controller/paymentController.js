@@ -12,6 +12,8 @@ const devProductId = 'prod_LsnRY5KYEfIGyc';
 const proProductId = 'prod_LsmoNI2tskuI3R';
 const proPlusProductId = 'prod_Loys2WqALki7gR';
 
+const YOUR_DOMAIN = 'http://localhost:3000';
+
 async function getCustomerId(ctx, passport) {
     await passport.authenticate("jwt", async (err, user, info) => {
         if (info) {
@@ -28,6 +30,17 @@ async function getCustomerId(ctx, passport) {
         ctx.body = { customerId: customer.customerId };
         ctx.status = 200;
     })(ctx);
+}
+
+async function getProducts(ctx) {
+    const productList = await stripe.products.list({ active: true });
+    const products = productList.data.map(p => ({
+        priceId: p.default_price,
+        details: p.metadata // pricing manually put in metadata, may conflict with actual price if not updated accordingly
+    }))
+    ctx.body = products;
+    ctx.status = 200;
+    return ctx;
 }
 
 async function handleWebhookEvent(ctx) {
@@ -72,13 +85,89 @@ async function handleWebhookEvent(ctx) {
             handleSubscriptionUpdated(subscription);
             break;
         default:
-            // Unexpected event type
-            // console.log(`Unhandled event type ${event.type}.`);
-            // console.log(event)
+        // Unexpected event type
+        // console.log(`Unhandled event type ${event.type}.`);
+        // console.log(event)
     }
     // Return a 200 response to acknowledge receipt of the event
     ctx.status = 200;
     return ctx;
+}
+
+async function createCheckoutSession(ctx, passport) {
+    await passport.authenticate("jwt", async (err, user, info) => {
+        if (info) {
+            ctx.body = { error: "Unauthorized" };
+            ctx.status = 401;
+            return ctx;
+        }
+        const priceId = ctx.request.body.priceId;
+        const customerId = ctx.request.body.customerId;
+        const session = await stripe.checkout.sessions.create({
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            success_url: `${YOUR_DOMAIN}?success=true?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+            customer: customerId,
+        });
+        ctx.body = { redirectUrl: session.url }
+        ctx.status = 200;
+        return ctx;
+    })(ctx);
+}
+
+async function createPortalSession(ctx, passport) {
+    await passport.authenticate("jwt", async (err, user, info) => {
+        if (info) {
+            ctx.body = { error: "Unauthorized" };
+            ctx.status = 401;
+            return ctx;
+        }
+        const configuration = await stripe.billingPortal.configurations.create({
+            features: {
+                customer_update: {
+                    enabled: false,
+                },
+                invoice_history: { enabled: true },
+                payment_method_update: { enabled: true },
+                subscription_cancel: {
+                    enabled: true,
+                    mode: 'at_period_end',
+                    cancellation_reason: {
+                        enabled: true,
+                        options: [
+                            'too_expensive',
+                            'missing_features',
+                            'switched_service',
+                            'unused',
+                            'customer_service',
+                            'too_complex',
+                            'low_quality',
+                            'other'
+                        ]
+                    },
+                },
+                subscription_pause: { enabled: false },
+            },
+            business_profile: {
+                privacy_policy_url: YOUR_DOMAIN,
+                terms_of_service_url: YOUR_DOMAIN,
+            }
+        })
+        const customerId = ctx.request.body.customerId;
+        const session = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: YOUR_DOMAIN,
+            configuration: configuration.id,
+        });
+        ctx.body = { redirectUrl: session.url };
+        ctx.status = 200;
+    })(ctx);
 }
 
 /**
@@ -152,5 +241,8 @@ function getSubscriptionLevel(productId) {
 module.exports = {
     handleWebhookEvent,
     registerCustomer,
-    getCustomerId
+    getCustomerId,
+    getProducts,
+    createCheckoutSession,
+    createPortalSession,
 }

@@ -156,9 +156,21 @@ module.exports = (app, passport) => {
     await paymentController.getCustomerId(ctx, passport);
   })
 
+  router.get("/products", async (ctx) => {
+    await paymentController.getProducts(ctx);
+  })
+
   router.post('/webhook', async (ctx) => {
     await paymentController.handleWebhookEvent(ctx);
   });
+
+  router.post("/create-checkout-session", async (ctx) => {
+    await paymentController.createCheckoutSession(ctx, passport);
+  })
+
+  router.post("/create-portal-session", async (ctx) => {
+    await paymentController.createPortalSession(ctx, passport);
+  })
 
   prefixRouter.use("/auth", router.routes(), router.allowedMethods());
 
