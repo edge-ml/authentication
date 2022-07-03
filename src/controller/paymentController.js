@@ -4,6 +4,10 @@
 const Model = require("../models/userModel").model;
 const stripe = require('stripe')('sk_test_51L7KlPAI18ryOlAQVK2aeFJDxgLJ4I2LQXrTjyaZ1b5z1WK9fx5CoCDtpcqXzXXBUEbgJ1fzSinKMm25mvW09MBX00UmHwIuGO')
 
+const devSubLevel = 'standard';
+const proSubLevel = 'upgraded';
+const proPlusSubLevel = 'unlimited';
+
 const devProductId = 'prod_LsnRY5KYEfIGyc';
 const proProductId = 'prod_LsmoNI2tskuI3R';
 const proPlusProductId = 'prod_Loys2WqALki7gR';
@@ -55,24 +59,22 @@ async function handleWebhookEvent(ctx) {
     const status = subscription.status;
     // Handle the event
     switch (event.type) {
-        // case 'customer.subscription.deleted':
-        //     subscription = event.data.object;
-        //     status = subscription.status;
-        //     console.log(`Subscription status is ${status}.`);
-        //     // Then define and call a method to handle the subscription deleted.
-        //     // handleSubscriptionDeleted(subscriptionDeleted);
-        //     break;
+        case 'customer.subscription.deleted':
+            console.log(`Subscription deleted, status is ${status}.`);
+            handleSubscriptionDeleted(subscription);
+            break;
         case 'customer.subscription.created':
             console.log(`Subscription created, status is ${status}.`);
-            handleSubscription(subscription);
+            handleSubscriptionCreated(subscription);
             break;
         case 'customer.subscription.updated':
             console.log(`Subscription updated, status is ${status}.`);
-            handleSubscription(subscription);
+            handleSubscriptionUpdated(subscription);
             break;
         default:
             // Unexpected event type
-            console.log(`Unhandled event type ${event.type}.`);
+            // console.log(`Unhandled event type ${event.type}.`);
+            // console.log(event)
     }
     // Return a 200 response to acknowledge receipt of the event
     ctx.status = 200;
@@ -88,18 +90,33 @@ async function registerCustomer(email, name, userModel) {
     const customer = await stripe.customers.create({
         email: email,
         name: name,
+        test_clock: 'clock_1LHUqaAI18ryOlAQKzy14eam', // for testing purposes, remove in production
     });
     userModel.customerId = customer.id;
 }
 
-async function handleSubscription(subscription) {
+// TODO: check first time subscriptions if the subscription updated event is triggered
+//       check the behaviour of downgrades/upgrades to subscription level
+//       find a solution to log out after issuing new jwt
+//       fix jwt expiration time
+
+async function handleSubscriptionCreated(subscription) {
+    // await stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+}
+
+async function handleSubscriptionUpdated(subscription) {
     const status = subscription.status;
     const customerId = subscription.customer;
     const productId = subscription.plan.product;
+    console.log('\n\nHandling update event\n\n');
+    console.log(subscription)
+    console.log(status)
     if (status !== 'active') {
         return;
     }
     const user = await Model.findOne({ customerId: customerId });
+    console.log('current userLevel is: ' + user.subscriptionLevel);
+    console.log('next userLevel will be: ' + getSubscriptionLevel(productId));
     if (!user) {
         console.error(`Customer not found, customerId: ${customerId}, subscription information:`);
         console.error(subscription)
@@ -109,13 +126,25 @@ async function handleSubscription(subscription) {
     await user.save();
 }
 
+async function handleSubscriptionDeleted(subscription) {
+    const customerId = subscription.customer;
+    const user = await Model.findOne({ customerId: customerId });
+    if (!user) {
+        console.error(`Customer not found, customerId: ${customerId}, subscription information:`);
+        console.error(subscription)
+        return;
+    }
+    user.subscriptionLevel = devSubLevel;
+    await user.save();
+}
+
 function getSubscriptionLevel(productId) {
     if (productId === devProductId) {
-        return 'standard';
+        return devSubLevel;
     } else if (productId === proProductId) {
-        return 'upgraded';
+        return proSubLevel;
     } else if (productId === proPlusProductId) {
-        return 'unlimited';
+        return proPlusSubLevel;
     }
     throw "Product id is not recognized";
 }
