@@ -3,8 +3,8 @@
         "db": "mongodb://localhost:27017/auth_test",
         "secret": "default_secret",
         "refresh_secret": "default_secret",
-        "ttl": 259200,
-        "refresh_ttl": 259200,
+        "ttl": 86400,
+        "refresh_ttl": 31556952,
         "autoIndex": true
     }
 }
