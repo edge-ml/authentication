@@ -79,6 +79,20 @@ async function loginUser(ctx) {
     };
 
     const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
+    const decodedRefresh = jwt.decode(user.refreshToken);
+    // check if the refresh token is expired / expiring soon
+    if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
+      user.refreshToken = jwt.sign(
+        {
+          id: user._id,
+        },
+        config.refresh_secret,
+        {
+          expiresIn: config.refresh_ttl,
+        }
+      );
+      await user.save();
+    }
 
     ctx.body = {
       access_token: `Bearer ${token}`,
