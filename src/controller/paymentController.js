@@ -111,8 +111,8 @@ async function createCheckoutSession(ctx, passport) {
                 },
             ],
             mode: 'subscription',
-            success_url: `${YOUR_DOMAIN}?success=true?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+            success_url: `${YOUR_DOMAIN}/payment?success=true?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${YOUR_DOMAIN}/payment?canceled=true`,
             customer: customerId,
         });
         ctx.body = { redirectUrl: session.url }
