@@ -22,6 +22,7 @@ async function getCustomerId(ctx, passport) {
             return ctx;
         }
         const customer = await Model.findById({ _id: user._id });
+        // should be checked against stripe servers if the database is to be kept consistent
         if (!customer.customerId) {
             await registerCustomer(customer.email, customer.userName, customer);
             await customer.save();
@@ -153,6 +154,15 @@ async function createPortalSession(ctx, passport) {
                     },
                 },
                 subscription_pause: { enabled: false },
+                subscription_update: {
+                    enabled: true,
+                    default_allowed_updates: ['price'],
+                    products: [
+                        { product: 'prod_Loys2WqALki7gR', prices: ['price_1L7KuJAI18ryOlAQr9RuO7As'] }, // pro+
+                        { product: 'prod_LsmoNI2tskuI3R', prices: ['price_1LB1EoAI18ryOlAQ3r3GktSV'] } // pro
+                    ],
+                    proration_behavior: 'create_prorations',
+                }
             },
             business_profile: {
                 privacy_policy_url: YOUR_DOMAIN,
@@ -179,7 +189,7 @@ async function registerCustomer(email, name, userModel) {
     const customer = await stripe.customers.create({
         email: email,
         name: name,
-        test_clock: 'clock_1LHUqaAI18ryOlAQKzy14eam', // for testing purposes, remove in production
+        test_clock: "clock_1LYUWCAI18ryOlAQnGAArbtq", // for testing purposes, remove in production
     });
     userModel.customerId = customer.id;
 }
