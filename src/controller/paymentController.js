@@ -172,7 +172,7 @@ async function createPortalSession(ctx, passport) {
         const customerId = ctx.request.body.customerId;
         const session = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: YOUR_DOMAIN,
+            return_url: `${YOUR_DOMAIN}/payment`,
             configuration: configuration.id,
         });
         ctx.body = { redirectUrl: session.url };
