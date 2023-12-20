@@ -13,6 +13,7 @@
   "author": "Edge-ML",
   "license": "MIT",
   "dependencies": {
+    "amqplib": "^0.10.3",
     "bcrypt": "^5.1.0",
     "bcryptjs": "^2.4.3",
     "chai": "^4.3.7",

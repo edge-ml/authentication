@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { MQ } = require("../messageBroker/publisher")
 
 const User = new mongoose.Schema({
 	email: {
@@ -41,6 +42,15 @@ const User = new mongoose.Schema({
 		default: 'standard'
 	}
 });
+
+User.pre("findOneAndDelete", async function (next) {
+	const filter = this.getFilter();
+    const deletedUser = await this.model.findOne(filter);
+	await MQ.init()
+	await MQ.send("userDelete", deletedUser._id)
+	next();
+  });
+
 
 module.exports = {
 	model: mongoose.model('User', User),
