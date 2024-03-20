@@ -1,13 +1,11 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const Config = require("config");
+const config = require("../../config")
 const { ObjectId } = require("mongoose").Types;
 
 const Model = require("../models/userModel").model;
 
-const config = Config.get("server");
-
-const secret = process.env.SECRET || config.secret;
+const secret = config.SECRET_KEY;
 
 /**
  * register a new user
@@ -25,9 +23,9 @@ async function registerNewUser(ctx) {
       {
         id: result._id,
       },
-      config.refresh_secret,
+      config.REFRESH_TOKEN,
       {
-        expiresIn: config.refresh_ttl,
+        expiresIn: config.REFRESH_TTL,
       }
     );
 
@@ -78,7 +76,7 @@ async function loginUser(ctx) {
       subscriptionLevel: user.subscriptionLevel,
     };
 
-    const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
+    const token = jwt.sign(payload, secret, { expiresIn: config.SERVER_TTL });
     const decodedRefresh = jwt.decode(user.refreshToken);
     // check if the refresh token is expired / expiring soon
     if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
@@ -86,9 +84,9 @@ async function loginUser(ctx) {
         {
           id: user._id,
         },
-        config.refresh_secret,
+        config.REFRESH_SECRET,
         {
-          expiresIn: config.refresh_ttl,
+          expiresIn: config.REFRESH_TTL,
         }
       );
       await user.save();
@@ -117,7 +115,7 @@ async function loginUserRefresh(ctx) {
   try {
     const jwtUserObject = await jwt.verify(
       ctx.request.body.refresh_token,
-      config.refresh_secret
+      config.REFRESH_SECRET
     );
 
     // retrieve user
@@ -139,7 +137,7 @@ async function loginUserRefresh(ctx) {
       subscriptionLevel: user.subscriptionLevel,
     };
 
-    const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
+    const token = jwt.sign(payload, secret, { expiresIn: config.SERVER_TTL });
     ctx.body = { access_token: `${token}` };
 
     return ctx;

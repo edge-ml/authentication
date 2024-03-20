@@ -1,7 +1,7 @@
 const Koa          = require('koa');
 const KoaStatic    = require('koa-static');
 const logger       = require('koa-logger');
-const Config       = require('config');
+const config       = require('./config');
 const mongoose     = require('mongoose');
 const cors         = require('koa-cors');
 const convert      = require('koa-convert');
@@ -18,14 +18,11 @@ const passportConfig     = require('./src/auth/passport-config');
 // Set mongoose.Promise to any Promise implementation
 mongoose.Promise = Promise;
 
-// parse config
-const config = Config.get('server');
-
 // instantiate koa
 const server = new Koa();
 
 // connect to Mongo
-mongoose.connect(config.db, {useNewUrlParser: true});
+mongoose.connect(config.DATABASE_URI + config.DATABASE_COLLECTION_AUTH, {useNewUrlParser: true});
 
 
 // Serve documentation

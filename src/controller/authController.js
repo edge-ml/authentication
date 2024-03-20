@@ -1,11 +1,9 @@
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const jwt    = require('jsonwebtoken');
-const Config = require('config');
+const config = require("../../config")
 
-const config = Config.get('server');
-
-const secret = process.env.SECRET || config.secret;
+const secret = config.SECRET_KEY;
 
 /**
  * handle authentication response
@@ -122,7 +120,7 @@ async function verify2Fa(ctx) {
 		twoFactorVerified: true
 	};
 
-	const jwtToken = jwt.sign(payload, secret, {expiresIn: config.ttl});
+	const jwtToken = jwt.sign(payload, secret, {expiresIn: config.SERVER_TTL});
 
 	ctx.body = {
 		isTwoFactorAuthenticated: true,
