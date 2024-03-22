@@ -23,9 +23,9 @@ async function registerNewUser(ctx) {
       {
         id: result._id,
       },
-      config.REFRESH_TOKEN,
+      config.SERVER_REFRESH_SECRET,
       {
-        expiresIn: config.REFRESH_TTL,
+        expiresIn: config.SERVER_REFRESH_TTL,
       }
     );
 
@@ -37,6 +37,7 @@ async function registerNewUser(ctx) {
     ctx.status = 201;
     return ctx;
   } catch (error) {
+    console.log(error)
     ctx.body = { error: error.message };
     ctx.status = 500;
     return ctx;
