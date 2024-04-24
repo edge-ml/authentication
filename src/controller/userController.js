@@ -85,7 +85,7 @@ async function loginUser(ctx) {
         {
           id: user._id,
         },
-        config.REFRESH_SECRET,
+        config.SERVER_REFRESH_SECRET,
         {
           expiresIn: config.SERVER_REFRESH_TTL,
         }
