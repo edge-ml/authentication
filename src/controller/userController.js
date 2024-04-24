@@ -87,7 +87,7 @@ async function loginUser(ctx) {
         },
         config.REFRESH_SECRET,
         {
-          expiresIn: config.REFRESH_TTL,
+          expiresIn: config.SERVER_REFRESH_TTL,
         }
       );
       await user.save();
