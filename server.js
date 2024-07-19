@@ -1,93 +1,57 @@
-const Koa          = require('koa');
-const KoaStatic    = require('koa-static');
-const logger       = require('koa-logger');
-const config       = require('./config');
-const mongoose     = require('mongoose');
-const cors         = require('koa-cors');
-const convert      = require('koa-convert');
-const bodyParser   = require('koa-bodyparser');
-const passport     = require('koa-passport');
-const dbSchema     = require("koa-mongoose-erd-generator");
-const yamljs       = require("yamljs")
-const koaSwagger   = require("koa2-swagger-ui").koaSwagger;
-const fs           = require("fs");
-const path         = require("path");
-
-const passportConfig     = require('./src/auth/passport-config');
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const yamljs = require('yamljs');
+const fs = require('fs');
+const path = require('path');
+const config = require('./config');
+const passportConfig = require('./src/auth/passport-config');
+const passport = require('./src/passport');
+const cookieParser = require('cookie-parser');
 
 // Set mongoose.Promise to any Promise implementation
 mongoose.Promise = Promise;
 
-// instantiate koa
-const server = new Koa();
+// instantiate express
+const app = express();
+app.use(cookieParser());
 
 // connect to Mongo
-mongoose.connect(config.DATABASE_URI + config.DATABASE_COLLECTION_AUTH, {useNewUrlParser: true});
-
+mongoose.connect(config.DATABASE_URI + config.DATABASE_COLLECTION_AUTH, { useNewUrlParser: true });
 
 // Serve documentation
+const spec = yamljs.load('./docs/docs.yaml');
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec));
 
-server.use(
-	dbSchema(
-	  "/auth/docs/db",
-	  { modelsPath: __dirname + "/src/models", nameColor: "#007bff" },
-	  __dirname + "/docs/dbSchema.html"
-	)
-  );
-  
-  
-  const spec = yamljs.load("./docs/docs.yaml");
-  server.use(
-	koaSwagger({
-	  routePrefix: "/docs",
-	  title: "Explorer",
-	  swaggerOptions: { spec },
-	  favicon: "/auth/docs/favicon.ico",
-	  hideTopbar: true,
-	})
-  );
-  const favIcon = fs.readFileSync(path.join(__dirname, "/docs/favicon.ico"));
-  server.use((ctx, next) => {
-	if (
-	  ctx.path == "/auth/docs/favicon.ico" &&
-	  ctx.method == "GET" &&
-	  ctx.method != "Head"
-	) {
-	  ctx.body = favIcon;
-	  ctx.status = 200;
-	  return ctx;
-	}
-	return next();
-  });
+// Setup favicon
+app.get('/auth/docs/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, '/docs/favicon.ico'));
+});
 
 // setup passport
-server.use(passport.initialize());
-passport.use(passportConfig.strategy);
+app.use(passport.initialize());
 
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-
-// setup koa middlewares
-server.use(convert(cors()));
-server.use(convert(bodyParser()));
-server.use(convert(logger()));
-server.use(KoaStatic('./public'));
+// setup express middlewares
+app.use(cors({
+	origin: "http://localhost:5173",
+	credentials: true
+}));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // unprotected routing
-const router = require('./src/routes/router')(server, passport);
-
-server.use(router.routes());
+const router = require('./src/routes/router')(passport);
+app.use('/auth', router);
 
 // catch all middleware
-server.use(async (ctx) => {
-	ctx.body = {error: 'Not Found'};
-	ctx.status = 404;
-	return ctx;
+app.use((req, res) => {
+    res.status(404).json({ error: 'Not Found' });
 });
 
-module.exports = server.listen(3002);
+// start the server
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});

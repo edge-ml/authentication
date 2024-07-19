@@ -10,6 +10,16 @@ const User = new mongoose.Schema({
 		match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'email address not valid']
 	},
 
+	provider: {
+		type: String,
+		required: false
+	},
+
+	providerId: {
+		type: String,
+		required: false
+	},
+
 	userName: {
 		type: String,
 		required: [true, 'please enter a username'],
@@ -19,7 +29,7 @@ const User = new mongoose.Schema({
 	password: {
 		type: String,
 		minLength: [8, 'password needs at least 8 characters'],
-		required: [true, 'please enter a password']
+		required: false
 	},
 	refreshToken: {
 		type: String
