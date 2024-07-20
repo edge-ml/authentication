@@ -54,6 +54,10 @@ module.exports = (passport) => {
 		await userController.loginUser(req, res, next);
 	});
 
+	router.get('/logout', async (req, res, next) => {
+		await userController.logoutUser(req, res, next);
+	})
+
 	/**
    * REFRESH
    *

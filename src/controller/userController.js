@@ -11,14 +11,14 @@ const secret = config.SECRET_KEY;
 
 
 async function getUser(req, res) {
-  console.log(req.user._id);
+	console.log(req.user._id);
 
-  const model = await Model.findById(req.user._id);
+	const user = await Model.findById(req.user._id);
 
-  if (model) {
-    return res.status(200).json(model); // Return here to avoid further execution
-  }
-  return res.status(404).json({ message: 'User not found' }); // Explicitly use return here as well
+	if (user) {
+		return res.status(200).json(user); // Return here to avoid further execution
+	}
+	return res.status(404).json({ message: 'User not found' }); // Explicitly use return here as well
 }
 
 /**
@@ -71,14 +71,20 @@ async function callbackOAuth(req, res, next) {
 		if (!user) {
 			return res.redirect('/login'); // Handle authentication failure
 		}
-    console.log('user', user);
+		console.log('user', user);
 		// Generate a JWT token
-    const token = generateToken(user);
+		const token = generateToken(user);
 
 		// Send token as HTTP-only cookie
 		res.cookie('jwt', token, { httpOnly: true });
-		res.redirect('http://localhost:5173'); // Redirect to a protected route or frontend application
+		res.redirect(config.HOST);
 	})(req, res, next);
+}
+
+
+async function logoutUser(req, res, next) {
+	res.cookie("jwt", undefined, { httpOnly: true });
+	res.redirect(config.HOST)
 }
 
 const generateToken = (user) => {
@@ -106,7 +112,7 @@ async function loginUser(req, res, next) {
 			return res.status(404).json({ error: info.message });
 		}
 
-    const token = generateToken(user);
+		const token = generateToken(user);
 		const decodedRefresh = jwt.decode(user.refreshToken);
 
 		if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
@@ -118,12 +124,8 @@ async function loginUser(req, res, next) {
 			await user.save();
 		}
 
-		return res.status(200).json({
-			access_token: `Bearer ${token}`,
-			refresh_token: `${user.refreshToken}`,
-			twoFactorEnabled: user.twoFactorEnabled,
-			twoFactorVerified: false,
-		});
+		res.cookie('jwt', token, { httpOnly: true });
+		res.status(200).json("Login success")
 	})(req, res);
 }
 
@@ -175,9 +177,9 @@ async function deleteUser(req, res, next) {
 		if (!email || email === '') {
 			return res.status(400).json({
 				error:
-          'This route deletes a user. To delete your user account, '
-          + 'please provide your email address in the request body. '
-          + 'Be careful, this action cannot be undone',
+					'This route deletes a user. To delete your user account, '
+					+ 'please provide your email address in the request body. '
+					+ 'Be careful, this action cannot be undone',
 			});
 		}
 		if (email !== user.email) {
@@ -322,7 +324,7 @@ async function getUserNames(req, res, next) {
 			if (
 				!(
 					Array.isArray(userIds)
-          && userIds.every((elm) => ObjectId.isValid(elm))
+					&& userIds.every((elm) => ObjectId.isValid(elm))
 				)
 			) {
 				return res.status(400).json({ error: 'Provide valid ids in an array' });
@@ -377,5 +379,6 @@ module.exports = {
 	getUserNameSuggestions,
 	loginGithub,
 	callbackOAuth,
-  getUser
+	getUser,
+	logoutUser
 };
