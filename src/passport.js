@@ -47,6 +47,7 @@ passport.use(
 			clientSecret: config.GITHUB_CLIENT_SECRET,
 			callbackURL: 'http://localhost:3002/auth/login/callback',
 			scope: ['user:email'],
+			promt: 'select_account',
 		},
 		async (accessToken, refreshToken, profile, done) => {
 			console.log(profile);
@@ -74,8 +75,8 @@ const cookieExtractor = (req) => {
 	if (req && req.cookies) {
 		jwt = req.cookies.jwt;
 	}
-    console.log(jwt);
-    console.log(jwtDecode(jwt));
+	console.log(jwt);
+	console.log(jwtDecode(jwt));
 
 
 
@@ -90,7 +91,7 @@ const opts = {
 
 passport.use(
 	new JwtStrategy(opts, async (jwtPayload, done) => {
-		Model.findOne({_id: jwtPayload.id}, (err, user) => {
+		Model.findOne({ _id: jwtPayload.id }, (err, user) => {
 			if (err) return done(err, false);
 			if (user) return done(null, user);
 			return done(null, false);

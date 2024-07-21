@@ -161,7 +161,7 @@ module.exports = (passport) => {
    * route: /userName
    * method: type: POST
    */
-	router.post('/userName', async (req, res) => {
+	router.post('/userName', passport.authenticate('jwt', { session: false }), async (req, res) => {
 		await userController.getUserNames(req, res, passport);
 	});
 

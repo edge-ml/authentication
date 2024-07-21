@@ -315,36 +315,26 @@ async function getUsersIds(req, res, next) {
  * get usernames by user IDs
  */
 async function getUserNames(req, res, next) {
-	passport.authenticate('jwt', async (err, user, info) => {
-		try {
-			if (info) {
-				return res.status(401).json({ error: 'Unauthorized' });
-			}
-			const userIds = req.body;
-			if (
-				!(
-					Array.isArray(userIds)
-					&& userIds.every((elm) => ObjectId.isValid(elm))
-				)
-			) {
-				return res.status(400).json({ error: 'Provide valid ids in an array' });
-			}
-			const users = await Model.find(
-				{ _id: { $in: userIds } },
-				{ userName: 1 }
-			);
-			const resData = userIds.map((id) => {
-				const user = users.find((elm) => String(elm._id) === id) || {
-					_id: id,
-					error: 'User not found',
-				};
-				return user;
-			});
-			res.status(200).json(resData);
-		} catch (e) {
-			console.log(e);
+	try {
+		console.log("GET user ids")
+		console.log(req.user)
+		const userIds = req.body;
+		if (!Array.isArray(userIds) || !userIds.every(elm => ObjectId.isValid(elm))) {
+			return res.status(400).json({ error: 'Provide valid ids in an array' });
 		}
-	})(req, res, next);
+		const users = await Model.find({ _id: { $in: userIds } }, { userName: 1 });
+		const resData = userIds.map(id => {
+			const user = users.find(elm => String(elm._id) === id) || {
+				_id: id,
+				error: 'User not found',
+			};
+			return user;
+		});
+		res.status(200).json(resData);
+	} catch (e) {
+		console.log(e);
+		res.status(500).json({ error: 'Internal Server Error' });
+	}
 }
 
 /**
