@@ -1,14 +1,14 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const config = require('../../config');
-const { ObjectId } = require('mongoose').Types;
-
 const passport = require('passport');
+const { ObjectId } = require('mongoose').Types;
+const config = require('../../config');
+
+const { generateToken } = require('../utils');
 
 const Model = require('../models/userModel').model;
 
 const secret = config.SECRET_KEY;
-
 
 async function getUser(req, res) {
 	console.log(req.user._id);
@@ -73,7 +73,7 @@ async function callbackOAuth(req, res, next) {
 		}
 		console.log('user', user);
 		// Generate a JWT token
-		const token = generateToken(user);
+		const { token } = generateToken(user, 'github');
 
 		// Send token as HTTP-only cookie
 		res.cookie('jwt', token, { httpOnly: true });
@@ -81,27 +81,10 @@ async function callbackOAuth(req, res, next) {
 	})(req, res, next);
 }
 
-
 async function logoutUser(req, res, next) {
-	res.cookie("jwt", undefined, { httpOnly: true });
-	res.redirect(config.HOST)
+	res.cookie('jwt', undefined, { httpOnly: true });
+	res.redirect(config.HOST);
 }
-
-const generateToken = (user) => {
-	const payload = {
-		id: user._id,
-		email: user.email,
-		userName: user.userName,
-		twoFactorEnabled: user.twoFactorEnabled,
-		twoFactorVerified: false,
-		subscriptionLevel: user.subscriptionLevel,
-	};
-
-	const token = jwt.sign(payload, config.SECRET_KEY, {
-		expiresIn: config.SERVER_TTL,
-	});
-	return token;
-};
 
 async function loginUser(req, res, next) {
 	passport.authenticate('local', async (err, user, info) => {
@@ -111,8 +94,7 @@ async function loginUser(req, res, next) {
 		if (!user) {
 			return res.status(404).json({ error: info.message });
 		}
-
-		const token = generateToken(user);
+		const { token } = generateToken(user, 'local');
 		const decodedRefresh = jwt.decode(user.refreshToken);
 
 		if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
@@ -125,7 +107,7 @@ async function loginUser(req, res, next) {
 		}
 
 		res.cookie('jwt', token, { httpOnly: true });
-		res.status(200).json("Login success")
+		res.status(200).json('Login success');
 	})(req, res);
 }
 
@@ -177,9 +159,9 @@ async function deleteUser(req, res, next) {
 		if (!email || email === '') {
 			return res.status(400).json({
 				error:
-					'This route deletes a user. To delete your user account, '
-					+ 'please provide your email address in the request body. '
-					+ 'Be careful, this action cannot be undone',
+          'This route deletes a user. To delete your user account, '
+          + 'please provide your email address in the request body. '
+          + 'Be careful, this action cannot be undone',
 			});
 		}
 		if (email !== user.email) {
@@ -316,15 +298,18 @@ async function getUsersIds(req, res, next) {
  */
 async function getUserNames(req, res, next) {
 	try {
-		console.log("GET user ids")
-		console.log(req.user)
+		console.log('GET user ids');
+		console.log(req.user);
 		const userIds = req.body;
-		if (!Array.isArray(userIds) || !userIds.every(elm => ObjectId.isValid(elm))) {
+		if (
+			!Array.isArray(userIds)
+      || !userIds.every((elm) => ObjectId.isValid(elm))
+		) {
 			return res.status(400).json({ error: 'Provide valid ids in an array' });
 		}
 		const users = await Model.find({ _id: { $in: userIds } }, { userName: 1 });
-		const resData = userIds.map(id => {
-			const user = users.find(elm => String(elm._id) === id) || {
+		const resData = userIds.map((id) => {
+			const user = users.find((elm) => String(elm._id) === id) || {
 				_id: id,
 				error: 'User not found',
 			};
@@ -370,5 +355,5 @@ module.exports = {
 	loginGithub,
 	callbackOAuth,
 	getUser,
-	logoutUser
+	logoutUser,
 };

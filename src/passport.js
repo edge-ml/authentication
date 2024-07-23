@@ -3,12 +3,13 @@ const LocalStrategy = require('passport-local').Strategy;
 const JwtStrategy = require('passport-jwt').Strategy;
 const { ExtractJwt } = require('passport-jwt');
 const bcrypt = require('bcrypt');
+const jwtDecode = require('jwt-decode');
+const GithubStrategy = require('passport-github2');
+const OAuth2Strategy = require('passport-oauth2');
 const Model = require('./models/userModel').model;
 const config = require('../config'); // Adjust the path to your config
 const { validateEmail } = require('./utils');
-const OAuth2Strategy = require('passport-oauth2');
-const GithubStrategy = require('passport-github2');
-const jwtDecode = require('jwt-decode');
+const { generateToken } = require('./utils');
 
 // Local Strategy
 passport.use(
@@ -31,7 +32,6 @@ passport.use(
 				if (!isMatch) {
 					return done(null, false, { message: 'Incorrect password' });
 				}
-
 				return done(null, user);
 			} catch (error) {
 				return done(error);
@@ -60,10 +60,14 @@ passport.use(
 			};
 			console.log(user);
 
-			const res = await Model.findOneAndUpdate({ provider: 'github', providerId: profile.id }, user, {
-				upsert: true,
-				new: true,
-			});
+			const res = await Model.findOneAndUpdate(
+				{ provider: 'github', providerId: profile.id },
+				user,
+				{
+					upsert: true,
+					new: true,
+				}
+			);
 			console.log(res);
 			return done(null, res);
 		}
@@ -77,8 +81,6 @@ const cookieExtractor = (req) => {
 	}
 	console.log(jwt);
 	console.log(jwtDecode(jwt));
-
-
 
 	return jwt;
 };
