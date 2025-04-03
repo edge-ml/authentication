@@ -11,8 +11,6 @@ const Model = require('../models/userModel').model;
 const secret = config.SECRET_KEY;
 
 async function getUser(req, res) {
-	console.log(req.user._id);
-
 	const user = await Model.findById(req.user._id);
 
 	if (user) {
@@ -49,29 +47,24 @@ async function registerNewUser(req, res) {
 		// send response
 		res.status(201).json({ message: 'Successfully created user!' });
 	} catch (error) {
-		console.log(error);
 		res.status(500).json({ error: error.message });
 	}
 }
 
 async function loginGithub(req, res) {
-	console.log('loginGithub');
 	passport.authenticate('github', {
 		scope: ['user:email'],
 	})(req, res);
 }
 
 async function callbackOAuth(req, res, next) {
-	console.log('callbackOAuth');
 	passport.authenticate('github', { session: false }, (err, user, info) => {
 		if (err) {
-			console.log(err);
 			return next(err); // Handle error
 		}
 		if (!user) {
 			return res.redirect('/login'); // Handle authentication failure
 		}
-		console.log('user', user);
 		// Generate a JWT token
 		const { token } = generateToken(user, 'github');
 
@@ -298,8 +291,6 @@ async function getUsersIds(req, res, next) {
  */
 async function getUserNames(req, res, next) {
 	try {
-		console.log('GET user ids');
-		console.log(req.user);
 		const userIds = req.body;
 		if (
 			!Array.isArray(userIds)
@@ -317,7 +308,6 @@ async function getUserNames(req, res, next) {
 		});
 		res.status(200).json(resData);
 	} catch (e) {
-		console.log(e);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
 }

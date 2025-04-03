@@ -21,8 +21,6 @@ const generateToken = (user, provider) => {
 		subscriptionLevel: user.subscriptionLevel,
 	};
 
-	console.log(payload);
-
 	const token = jwt.sign(payload, config.SECRET_KEY, {
 		expiresIn: config.SERVER_TTL,
 	});
