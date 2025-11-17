@@ -1,6 +1,6 @@
-FROM node:16
+FROM node:21
 
-WORKDIR /opt/aura-auth
+WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .

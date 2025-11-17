@@ -1,153 +1,141 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const Config = require("config");
-const { ObjectId } = require("mongoose").Types;
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const passport = require('passport');
+const { ObjectId } = require('mongoose').Types;
+const config = require('../../config');
 
-const Model = require("../models/userModel").model;
+const { generateToken } = require('../utils');
 
-const config = Config.get("server");
+const Model = require('../models/userModel').model;
 
-const secret = process.env.SECRET || config.secret;
+const secret = config.SECRET_KEY;
+
+async function getUser(req, res) {
+	const user = await Model.findById(req.user._id);
+
+	if (user) {
+		return res.status(200).json(user); // Return here to avoid further execution
+	}
+	return res.status(404).json({ message: 'User not found' }); // Explicitly use return here as well
+}
 
 /**
  * register a new user
  */
-async function registerNewUser(ctx) {
-  try {
-    // create user
-    const result = new Model(ctx.request.body);
+async function registerNewUser(req, res) {
+	try {
+		// create user
+		const result = new Model(req.body);
 
-    // encrypt password
-    const salt = bcrypt.genSaltSync(10);
-    result.password = bcrypt.hashSync(result.password, salt);
+		// encrypt password
+		const salt = bcrypt.genSaltSync(10);
+		result.password = bcrypt.hashSync(result.password, salt);
 
-    result.refreshToken = jwt.sign(
-      {
-        id: result._id,
-      },
-      config.refresh_secret,
-      {
-        expiresIn: config.refresh_ttl,
-      }
-    );
+		result.refreshToken = jwt.sign(
+			{
+				id: result._id,
+			},
+			config.SERVER_REFRESH_SECRET,
+			{
+				expiresIn: config.SERVER_REFRESH_TTL,
+			}
+		);
 
-    // store user
-    await result.save();
+		// store user
+		await result.save();
 
-    // send response
-    ctx.body = { message: "Successfully created user!" };
-    ctx.status = 201;
-    return ctx;
-  } catch (error) {
-    ctx.body = { error: error.message };
-    ctx.status = 500;
-    return ctx;
-  }
+		// send response
+		res.status(201).json({ message: 'Successfully created user!' });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
 }
 
-/**
- * log in user by name and return jwt
- */
-async function loginUser(ctx) {
-  // retrieve user
-  const users = await Model.find({});
-  let user = null;
-  if (validateEmail(ctx.request.body.email)) {
-    user = await Model.findOne({ email: ctx.request.body.email });
-  } else {
-    user = await Model.findOne({ userName: ctx.request.body.email });
-  }
+async function loginGithub(req, res) {
+	passport.authenticate('github', {
+		scope: ['user:email'],
+	})(req, res);
+}
 
-  // handle user not found
-  if (!user) {
-    ctx.body = { error: `user '${ctx.request.body.email}' not found` };
-    ctx.status = 404;
-    return ctx;
-  }
+async function callbackOAuth(req, res, next) {
+	passport.authenticate('github', { session: false }, (err, user, info) => {
+		if (err) {
+			return next(err); // Handle error
+		}
+		if (!user) {
+			return res.redirect('/login'); // Handle authentication failure
+		}
+		// Generate a JWT token
+		const { token } = generateToken(user, 'github');
 
-  const isMatch = bcrypt.compareSync(ctx.request.body.password, user.password);
+		// Send token as HTTP-only cookie
+		res.cookie('jwt', token, { httpOnly: true });
+		res.redirect(config.HOST);
+	})(req, res, next);
+}
 
-  if (isMatch) {
-    // password correct
-    const payload = {
-      id: user._id,
-      email: user.email,
-      userName: user.userName,
-      twoFactorEnabled: user.twoFactorEnabled,
-      twoFactorVerified: false,
-      subscriptionLevel: user.subscriptionLevel,
-    };
+async function logoutUser(req, res, next) {
+	res.cookie('jwt', undefined, { httpOnly: true });
+	res.redirect(config.HOST);
+}
 
-    const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
-    const decodedRefresh = jwt.decode(user.refreshToken);
-    // check if the refresh token is expired / expiring soon
-    if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
-      user.refreshToken = jwt.sign(
-        {
-          id: user._id,
-        },
-        config.refresh_secret,
-        {
-          expiresIn: config.refresh_ttl,
-        }
-      );
-      await user.save();
-    }
+async function loginUser(req, res, next) {
+	passport.authenticate('local', async (err, user, info) => {
+		if (err) {
+			return next(err);
+		}
+		if (!user) {
+			return res.status(404).json({ error: info.message });
+		}
+		const { token } = generateToken(user, 'local');
+		const decodedRefresh = jwt.decode(user.refreshToken);
 
-    ctx.body = {
-      access_token: `Bearer ${token}`,
-      refresh_token: `${user.refreshToken}`,
-      twoFactorEnabled: user.twoFactorEnabled,
-      twoFactorVerified: false,
-    };
-    ctx.status = 200;
-    return ctx;
-  }
+		if (decodedRefresh.exp * 1000 - Date.now() <= 5 * 60 * 1000) {
+			user.refreshToken = jwt.sign(
+				{ id: user._id },
+				config.SERVER_REFRESH_SECRET,
+				{ expiresIn: config.SERVER_REFRESH_TTL }
+			);
+			await user.save();
+		}
 
-  // password incorrect
-  ctx.status = 400;
-  ctx.body = { error: "Password not correct!" };
-  return ctx;
+		res.cookie('jwt', token, { httpOnly: true });
+		res.status(200).json('Login success');
+	})(req, res);
 }
 
 /**
  * log in user by refresh token and return jwt
  */
-async function loginUserRefresh(ctx) {
-  try {
-    const jwtUserObject = await jwt.verify(
-      ctx.request.body.refresh_token,
-      config.refresh_secret
-    );
+async function loginUserRefresh(req, res) {
+	try {
+		const jwtUserObject = await jwt.verify(
+			req.body.refresh_token,
+			config.REFRESH_SECRET
+		);
 
-    // retrieve user
-    const user = await Model.findById(jwtUserObject.id);
+		// retrieve user
+		const user = await Model.findById(jwtUserObject.id);
 
-    // check if token is revoked
-    if (user.refreshToken !== ctx.request.body.refresh_token) {
-      ctx.status = 401;
-      ctx.body = { error: "token is revoked" };
-      return ctx;
-    }
+		// check if token is revoked
+		if (user.refreshToken !== req.body.refresh_token) {
+			return res.status(401).json({ error: 'token is revoked' });
+		}
 
-    const payload = {
-      mail: user.email,
-      userName: user.userName,
-      id: user._id,
-      twoFactorEnabled: user.twoFactorEnabled,
-      twoFactorVerified: false,
-      subscriptionLevel: user.subscriptionLevel,
-    };
+		const payload = {
+			mail: user.email,
+			userName: user.userName,
+			id: user._id,
+			twoFactorEnabled: user.twoFactorEnabled,
+			twoFactorVerified: false,
+			subscriptionLevel: user.subscriptionLevel,
+		};
 
-    const token = jwt.sign(payload, secret, { expiresIn: config.ttl });
-    ctx.body = { access_token: `${token}` };
-
-    return ctx;
-  } catch (e) {
-    ctx.status = 401;
-    ctx.body = { error: "token expired" };
-    return ctx;
-  }
+		const token = jwt.sign(payload, secret, { expiresIn: config.SERVER_TTL });
+		res.json({ access_token: `${token}` });
+	} catch (e) {
+		res.status(401).json({ error: 'token expired' });
+	}
 }
 
 /**
@@ -155,252 +143,207 @@ async function loginUserRefresh(ctx) {
  *
  * only possible if body contains email to prevent unintentional deletions
  */
-async function deleteUser(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    if (info || !user) {
-      ctx.body = { error: "Unauthorized" };
-      ctx.status = 401;
-      return ctx;
-    }
-    const { email } = ctx.request.body;
-    if (!email || email === "") {
-      ctx.body = {
-        error:
-          "This route deletes a user. To delete your user account, " +
-          "please provide your email address in the request body. " +
-          "Be careful, this action cannot be undone",
-      };
-      ctx.status = 400;
-      return ctx;
-    }
-    if (email !== user.email) {
-      ctx.body = { error: "Provided e-mail does not match user e-mail." };
-      ctx.status = 400;
-      return ctx;
-    }
-    await Model.findOneAndDelete({ email });
-    ctx.body = { message: `Deleted user with e-mail: ${email}` };
-    ctx.status = 200;
-    return ctx;
-  })(ctx);
+async function deleteUser(req, res, next) {
+	passport.authenticate('jwt', async (err, user, info) => {
+		if (info || !user) {
+			return res.status(401).json({ error: 'Unauthorized' });
+		}
+		const { email } = req.body;
+		if (!email || email === '') {
+			return res.status(400).json({
+				error:
+          'This route deletes a user. To delete your user account, '
+          + 'please provide your email address in the request body. '
+          + 'Be careful, this action cannot be undone',
+			});
+		}
+		if (email !== user.email) {
+			return res
+				.status(400)
+				.json({ error: 'Provided e-mail does not match user e-mail.' });
+		}
+		await Model.findOneAndDelete({ email });
+		res.status(200).json({ message: `Deleted user with e-mail: ${email}` });
+	})(req, res, next);
 }
 
 /**
  * get all users
  */
-async function getUsers(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    if (info) {
-      ctx.body = { error: "Unauthorized" };
-      ctx.status = 401;
-      return ctx;
-    }
-    if (user.role !== "admin") {
-      ctx.body = { error: "Forbidden" };
-      ctx.status = 401;
-      return ctx;
-    }
-    ctx.body = await Model.find({}, "-__v -password -refreshToken");
-    ctx.status = 200;
-    return ctx;
-  })(ctx);
+async function getUsers(req, res, next) {
+	passport.authenticate('jwt', async (err, user, info) => {
+		if (info) {
+			return res.status(401).json({ error: 'Unauthorized' });
+		}
+		if (user.role !== 'admin') {
+			return res.status(401).json({ error: 'Forbidden' });
+		}
+		const users = await Model.find({}, '-__v -password -refreshToken');
+		res.status(200).json(users);
+	})(req, res, next);
 }
 
 /**
  * Change the e-mail address of a user
  */
-async function changeUserMail(ctx, passport) {
-  try {
-    await passport.authenticate("jwt", async (err, user, info) => {
-      if (info) {
-        ctx.body = { error: "Unauthorized" };
-        ctx.status = 401;
-        return ctx;
-      }
-      const { email } = ctx.request.body;
-      if (!validateEmail(email)) {
-        ctx.body = `${email} is not a valid e-mail address`;
-        ctx.status = 400;
-      } else {
-        await Model.findByIdAndUpdate({ _id: user._id }, { $set: { email } });
-        ctx.body = {
-          message: `Changed e-mail address from ${user.email} to ${email}`,
-        };
-        ctx.status = 200;
-      }
-    })(ctx);
-  } catch (error) {
-    ctx.body = { error: "E-mail already exists" };
-    ctx.status = 400;
-    return ctx;
-  }
+async function changeUserMail(req, res, next) {
+	try {
+		passport.authenticate('jwt', async (err, user, info) => {
+			if (info) {
+				return res.status(401).json({ error: 'Unauthorized' });
+			}
+			const { email } = req.body;
+			if (!validateEmail(email)) {
+				return res
+					.status(400)
+					.json({ error: `${email} is not a valid e-mail address` });
+			}
+			await Model.findByIdAndUpdate({ _id: user._id }, { $set: { email } });
+			res.status(200).json({
+				message: `Changed e-mail address from ${user.email} to ${email}`,
+			});
+		})(req, res, next);
+	} catch (error) {
+		res.status(400).json({ error: 'E-mail already exists' });
+	}
 }
 
-async function changeUserName(ctx, passport) {
-  try {
-    await passport.authenticate("jwt", async (err, user, info) => {
-      if (info) {
-        ctx.body = { error: "Unauthorized" };
-        ctx.status = 401;
-        return ctx;
-      }
-      const { userName } = ctx.request.body;
-      await Model.findByIdAndUpdate({ _id: user._id }, { $set: { userName } });
-      ctx.body = `Changed username from ${user.userName} to ${userName}`;
-      ctx.status = 200;
-      return ctx;
-    })(ctx);
-  } catch (error) {
-    ctx.body = { error: "Username already exists" };
-    ctx.status = 400;
-    return ctx;
-  }
+async function changeUserName(req, res, next) {
+	try {
+		passport.authenticate('jwt', async (err, user, info) => {
+			if (info) {
+				return res.status(401).json({ error: 'Unauthorized' });
+			}
+			const { userName } = req.body;
+			await Model.findByIdAndUpdate({ _id: user._id }, { $set: { userName } });
+			res.status(200).json({
+				message: `Changed username from ${user.userName} to ${userName}`,
+			});
+		})(req, res, next);
+	} catch (error) {
+		res.status(400).json({ error: 'Username already exists' });
+	}
 }
 
 /**
  * Change the password of a user
  */
-async function changeUserPassword(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    if (info) {
-      ctx.body = { error: "Unauthorized" };
-      ctx.status = 401;
-      return ctx;
-    }
-    const { password, newPassword } = ctx.request.body;
-    if (!password || !newPassword) {
-      ctx.status = 400;
-      ctx.body = "Provide the current password and the new password";
-      return ctx;
-    }
-    const isMatch = bcrypt.compareSync(password, user.password);
-    if (isMatch) {
-      const salt = bcrypt.genSaltSync(10);
-      await Model.findByIdAndUpdate(
-        { _id: user._id },
-        { $set: { password: bcrypt.hashSync(newPassword, salt) } }
-      );
-      ctx.body = "Changed password";
-      ctx.status = 200;
-    } else {
-      ctx.body = { error: "Passwords do not match" };
-      ctx.status = 400;
-    }
-  })(ctx);
+async function changeUserPassword(req, res, next) {
+	passport.authenticate('jwt', async (err, user, info) => {
+		if (info) {
+			return res.status(401).json({ error: 'Unauthorized' });
+		}
+		const { password, newPassword } = req.body;
+		if (!password || !newPassword) {
+			return res
+				.status(400)
+				.json({ error: 'Provide the current password and the new password' });
+		}
+		const isMatch = bcrypt.compareSync(password, user.password);
+		if (isMatch) {
+			const salt = bcrypt.genSaltSync(10);
+			await Model.findByIdAndUpdate(
+				{ _id: user._id },
+				{ $set: { password: bcrypt.hashSync(newPassword, salt) } }
+			);
+			res.status(200).json({ message: 'Changed password' });
+		} else {
+			res.status(400).json({ error: 'Passwords do not match' });
+		}
+	})(req, res, next);
 }
 
 /**
- * TODO
  * Change the subscription level of a user
  */
-
-async function changeUserSubscriptionLevel(ctx, passport) {
-  
+async function changeUserSubscriptionLevel(req, res, next) {
+	// Implementation needed
 }
 
-async function getUsersIds(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    if (info) {
-      ctx.body = { error: "Unauthorized" };
-      ctx.status = 401;
-      return ctx;
-    }
-    const userNames = ctx.request.body;
-    if (!Array.isArray(userNames)) {
-      ctx.body = { error: "Provide valid usernames in an array" };
-      ctx.status = 401;
-      return ctx;
-    }
-    const userIds = await Model.find({ userName: userNames });
-    if (userIds.length != userNames.length) {
-      ctx.body = { error: "Some users could not be found" };
-      ctx.status = 400;
-      return ctx;
-    }
-    const res = [];
-    for (i = 0; i < userIds.length; i++) {
-      for (j = 0; j < userIds.length; j++) {
-        if (String(userNames[i]) === String(userIds[j].userName)) {
-          res.push({ _id: userIds[j]._id, userName: userIds[j].userName });
-        }
-      }
-    }
-    ctx.body = res;
-    ctx.status = 200;
-    return ctx;
-  })(ctx);
+/**
+ * get user IDs by usernames
+ */
+async function getUsersIds(req, res, next) {
+	passport.authenticate('jwt', async (err, user, info) => {
+		if (info) {
+			return res.status(401).json({ error: 'Unauthorized' });
+		}
+		const userNames = req.body;
+		if (!Array.isArray(userNames)) {
+			return res
+				.status(400)
+				.json({ error: 'Provide valid usernames in an array' });
+		}
+		const userIds = await Model.find({ userName: { $in: userNames } });
+		if (userIds.length != userNames.length) {
+			return res.status(400).json({ error: 'Some users could not be found' });
+		}
+		const resData = userIds.map((user) => ({
+			_id: user._id,
+			userName: user.userName,
+		}));
+		res.status(200).json(resData);
+	})(req, res, next);
 }
 
-async function getUserNames(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    try {
-      if (info) {
-        ctx.body = { error: "Unauthorized" };
-        ctx.status = 401;
-        return ctx;
-      }
-      const userIds = ctx.request.body;
-      if (
-        !(
-          Array.isArray(userIds) &&
-          userIds.every((elm) => ObjectId.isValid(elm))
-        )
-      ) {
-        ctx.body = { error: "Provide valid ids in an array" };
-        ctx.status = 401;
-        return ctx;
-      }
-      const res = [];
-      const users = await Model.find({ _id: userIds }, { userName: 1 });
-      userIds.forEach((userId) => {
-        const user = users.find((elm) => String(elm._id) === userId) || {
-          _id: userId,
-          error: "User not found",
-        };
-        res.push(user);
-      });
-      ctx.body = res;
-      ctx.status = 200;
-      return ctx;
-    } catch (e) {
-      console.log(e);
-    }
-  })(ctx);
+/**
+ * get usernames by user IDs
+ */
+async function getUserNames(req, res, next) {
+	try {
+		const userIds = req.body;
+		if (
+			!Array.isArray(userIds)
+      || !userIds.every((elm) => ObjectId.isValid(elm))
+		) {
+			return res.status(400).json({ error: 'Provide valid ids in an array' });
+		}
+		const users = await Model.find({ _id: { $in: userIds } }, { userName: 1 });
+		const resData = userIds.map((id) => {
+			const user = users.find((elm) => String(elm._id) === id) || {
+				_id: id,
+				error: 'User not found',
+			};
+			return user;
+		});
+		res.status(200).json(resData);
+	} catch (e) {
+		res.status(500).json({ error: 'Internal Server Error' });
+	}
 }
 
-async function getUserNameSuggestions(ctx, passport) {
-  await passport.authenticate("jwt", async (err, user, info) => {
-    if (info) {
-      ctx.body = { error: "Unauthorized" };
-      ctx.status = 401;
-      return ctx;
-    }
-    var regexp = new RegExp("^" + ctx.request.body.userName);
-    const possibleUsers = await Model.find({ userName: regexp })
-      .limit(100)
-      .select({ userName: 1, _id: 0 });
-    ctx.body = possibleUsers.map((elm) => elm.userName);
-    ctx.status = 200;
-    return ctx;
-  })(ctx);
-}
-
-function validateEmail(email) {
-  const re =
-    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  return email && re.test(String(email).toLowerCase());
+/**
+ * get username suggestions
+ */
+async function getUserNameSuggestions(req, res, next) {
+	passport.authenticate('jwt', async (err, user, info) => {
+		if (info) {
+			return res.status(401).json({ error: 'Unauthorized' });
+		}
+		const regexp = new RegExp(`^${req.body.userName}`);
+		const possibleUsers = await Model.find({ userName: regexp })
+			.limit(100)
+			.select({ userName: 1 });
+		const userNames = possibleUsers.map((elm) => elm.userName);
+		res.status(200).json(userNames);
+	})(req, res, next);
 }
 
 module.exports = {
-  registerNewUser,
-  loginUser,
-  loginUserRefresh,
-  deleteUser,
-  getUsers,
-  changeUserMail,
-  changeUserName,
-  changeUserPassword,
-  getUserNames,
-  getUsersIds,
-  getUserNameSuggestions,
+	registerNewUser,
+	loginUser,
+	loginUserRefresh,
+	deleteUser,
+	getUsers,
+	changeUserMail,
+	changeUserName,
+	changeUserPassword,
+	changeUserSubscriptionLevel,
+	getUsersIds,
+	getUserNames,
+	getUserNameSuggestions,
+	loginGithub,
+	callbackOAuth,
+	getUser,
+	logoutUser,
 };
