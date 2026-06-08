@@ -47,7 +47,29 @@ async function registerNewUser(req, res) {
 		// send response
 		res.status(201).json({ message: 'Successfully created user!' });
 	} catch (error) {
-		res.status(500).json({ error: error.message });
+		// Validation error: invalid email, password too short, missing fields
+		if (error.name === 'ValidationError') {
+			const firstError = Object.values(error.errors)[0];
+			return res.status(400).json({ error: firstError.message });
+		}
+		// Duplicate key: the native driver reports code 11000 (with keyPattern),
+		// while Mongoose 8 surfaces the schema's `unique` message as a
+		// MongooseError with no code. Handle both.
+		const isDuplicate = error.code === 11000
+			|| /duplicate key|already in use/i.test(error.message || '');
+		if (isDuplicate) {
+			const field = error.keyPattern && Object.keys(error.keyPattern)[0];
+			let message = 'This account already exists.';
+			if (field === 'email' || /e-?mail/i.test(error.message)) {
+				message = 'This email address is already registered.';
+			} else if (field === 'userName' || /user\s?name/i.test(error.message)) {
+				message = 'This username is already taken.';
+			}
+			return res.status(409).json({ error: message });
+		}
+		return res
+			.status(500)
+			.json({ error: 'Could not create user. Please try again later.' });
 	}
 }
 
