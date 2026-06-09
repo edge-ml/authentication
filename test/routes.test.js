@@ -21,9 +21,10 @@ let userID = "";
 describe("Testing API Routes", () => {
   before("check connection", function (done) {
     this.timeout(5000);
-    mongoose.connection.on("connected", () => {
-      return done();
-    });
+    // server.js calls mongoose.connect() at import, so the connection may
+    // already be established by the time this hook attaches its listener.
+    if (mongoose.connection.readyState === 1) return done();
+    mongoose.connection.once("connected", () => done());
   })
 
   before("drop collections", function (done) {
